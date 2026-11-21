@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} Incident Dossier | SOC Command Console{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-9">
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <a href="{{ url_for('main.incidents_list') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Back to Registry
+          </a>
+          <h3 class="fw-bold mb-0 text-white">
+            {% if action == 'Create' %}
+              <i class="bi bi-shield-plus text-info me-2"></i>Report New Security Incident
+            {% else %}
+              <i class="bi bi-pencil-square text-info me-2"></i>Edit Case: <span class="font-mono text-info">{{ incident.incident_number }}</span>
+            {% endif %}
+          </h3>
+        </div>
+        <p class="text-secondary small mb-0">Record incident scope, asset telemetry, threat indicators, and initial triage classification.</p>
+      </div>
+    </div>
+
+    <!-- Incident Form Container -->
+    <div class="soc-card p-4 p-md-5">
+      <form method="POST">
+        <!-- Section 1: Incident Classification -->
+        <div class="mb-4">
+          <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom border-soc-border">
+            <i class="bi bi-shield-lock text-info"></i>
+            <h6 class="fw-bold text-white mb-0 text-uppercase font-mono" style="font-size: 0.8rem; letter-spacing: 0.08em;">
+              1. Incident Classification & Priority
+            </h6>
+          </div>
+
+          <!-- Title -->
+          <div class="mb-3">
+            <label class="form-label required">Incident Title / Brief Summary</label>
+            <input type="text" name="title" class="form-control" placeholder="e.g. Credential stuffing alert against customer SSO" value="{{ form_data.get('title', '') }}" required>
+            <div class="form-text text-secondary small">Provide a concise, descriptive title outlining the nature of the incident.</div>
+          </div>
+
+          <div class="row g-3">
+            <!-- Severity Level -->
+            <div class="col-12 col-md-4">
+              <label class="form-label required">Severity Level</label>
+              <select name="severity" class="form-select" required>
+                {% for sev in severity_levels %}
+                  <option value="{{ sev }}" {% if form_data.get('severity') == sev %}selected{% elif action == 'Create' and sev == 'Medium' %}selected{% endif %}>
+                    {{ sev }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Category -->
+            <div class="col-12 col-md-4">
+              <label class="form-label required">Threat Category</label>
+              <select name="category" class="form-select" required>
+                {% for cat in categories %}
+                  <option value="{{ cat }}" {% if form_data.get('category') == cat %}selected{% elif action == 'Create' and cat == 'Malware' %}selected{% endif %}>
+                    {{ cat }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Workflow Status -->
+            <div class="col-12 col-md-4">
+              <label class="form-label">Workflow Status</label>
+              <select name="status" class="form-select">
+                {% for st in status_choices %}
+                  <option value="{{ st }}" {% if form_data.get('status') == st %}selected{% elif action == 'Create' and st == 'Open' %}selected{% endif %}>
+                    {{ st }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Scope & Asset Telemetry -->
+        <div class="mb-4">
+          <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom border-soc-border">
+            <i class="bi bi-hdd-network text-info"></i>
+            <h6 class="fw-bold text-white mb-0 text-uppercase font-mono" style="font-size: 0.8rem; letter-spacing: 0.08em;">
+              2. Scope & Target Infrastructure Telemetry
+            </h6>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <!-- Affected System -->
+            <div class="col-12 col-md-6">
+              <label class="form-label required">Affected System / Asset</label>
+              <input type="text" name="affected_system" class="form-control font-mono" placeholder="e.g. k8s-worker-02, fs-01.corp.internal, 192.168.10.45" value="{{ form_data.get('affected_system', '') }}" required>
+              <div class="form-text text-secondary small">Hostname, IP address, cluster, or cloud resource identifier.</div>
+            </div>
+
+            <!-- Reporter -->
+            <div class="col-12 col-md-6">
+              <label class="form-label">Reported By / Source</label>
+              <input type="text" name="reporter" class="form-control" placeholder="e.g. SIEM Sensor, Employee Name, SOC L1" value="{{ form_data.get('reporter', 'SOC Analyst') }}">
+              <div class="form-text text-secondary small">Individual or automated sensor that flagged the anomaly.</div>
+            </div>
+          </div>
+
+          {% if action == 'Create' %}
+          <div class="mb-3">
+            <label class="form-label">Initial Assignee</label>
+            <input type="text" name="assigned_to" class="form-control" placeholder="e.g. Alex Chen (SOC Tier 2) or Unassigned" value="{{ form_data.get('assigned_to', 'Unassigned') }}">
+            <div class="form-text text-secondary small">Specialist or team handling initial containment.</div>
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label required">Editor / Updating Operator</label>
+            <input type="text" name="editor" class="form-control" value="SOC Analyst" required>
+            <div class="form-text text-secondary small">Operator name logged into the tamper-evident audit trail.</div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Section 3: Threat Scope & Indicators of Compromise -->
+        <div class="mb-4">
+          <div class="d-flex align-items-center gap-2 pb-2 mb-3 border-bottom border-soc-border">
+            <i class="bi bi-file-earmark-text text-info"></i>
+            <h6 class="fw-bold text-white mb-0 text-uppercase font-mono" style="font-size: 0.8rem; letter-spacing: 0.08em;">
+              3. Threat Narrative & Indicators of Compromise (IoCs)
+            </h6>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label required">Detailed Incident Description & Indicators of Compromise (IoCs)</label>
+            <textarea name="description" rows="5" class="form-control font-mono" placeholder="Describe the trigger event, alert IDs, suspicious IP addresses, domains, file hashes, observed behavior, and preliminary impact..." required>{{ form_data.get('description', '') }}</textarea>
+            <div class="form-text text-secondary small">Document observed telemetry, payloads, network flows, or impacted user accounts.</div>
+          </div>
+        </div>
+
+        <!-- Form Submission Actions -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-3 border-top border-soc-border">
+          <a href="{{ url_for('main.incidents_list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-x-circle me-1"></i>Cancel
+          </a>
+          <button type="submit" class="btn btn-cyan px-4 fw-bold">
+            {% if action == 'Create' %}
+              <i class="bi bi-shield-check me-1"></i> Register Security Incident
+            {% else %}
+              <i class="bi bi-save me-1"></i> Save Changes
+            {% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

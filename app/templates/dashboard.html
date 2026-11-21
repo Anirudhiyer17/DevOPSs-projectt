@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Executive Dashboard | Command Telemetry{% endblock %}
+
+{% block content %}
+<!-- Large SOC Dashboard Heading & Quick Actions -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h2 class="fw-bold mb-0 text-white tracking-tight">Security Operations Center</h2>
+      <span class="badge bg-dark border border-info text-info font-mono px-2 py-1" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+        <span class="pulse-indicator pulse-cyan me-1" style="width: 6px; height: 6px;"></span>LIVE TELEMETRY
+      </span>
+    </div>
+    <p class="text-secondary mb-0 small">Real-time cyber threat monitoring, automated triage metrics, and lifecycle incident command.</p>
+  </div>
+  
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <form action="{{ url_for('main.demo_seed') }}" method="POST" class="d-inline">
+      <button type="submit" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" title="Populate realistic incidents for college presentation">
+        <i class="bi bi-database-fill-gear"></i>
+        <span>Load Demo Incidents</span>
+      </button>
+    </form>
+    <a href="{{ url_for('main.export_csv') }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+      <i class="bi bi-download"></i>
+      <span>Export CSV</span>
+    </a>
+    <a href="{{ url_for('main.incident_create') }}" class="btn btn-sm btn-cyan d-flex align-items-center gap-1 shadow">
+      <i class="bi bi-plus-circle-fill"></i>
+      <span>Report Case</span>
+    </a>
+  </div>
+</div>
+
+<!-- Critical Warning Banner (displayed if any critical incidents exist) -->
+{% if stats.critical > 0 %}
+<div class="alert alert-danger bg-danger-subtle border border-danger text-danger d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm" role="alert" style="background: rgba(239, 68, 68, 0.12) !important;">
+  <div class="d-flex align-items-center gap-3">
+    <span class="pulse-indicator" style="width: 11px; height: 11px;"></span>
+    <div>
+      <div class="fw-bold text-danger text-uppercase font-mono small tracking-wide">Critical Threat Alert Active</div>
+      <div class="text-light small">
+        There {% if stats.critical == 1 %}is <strong class="text-danger">1 critical severity incident</strong> requiring immediate analyst triage.{% else %}are <strong class="text-danger">{{ stats.critical }} critical incidents</strong> requiring immediate triage.{% endif %}
+      </div>
+    </div>
+  </div>
+  <a href="{{ url_for('main.incidents_list', severity='Critical') }}" class="btn btn-sm btn-danger fw-semibold mt-2 mt-md-0 d-flex align-items-center gap-1">
+    <span>Filter Critical Cases</span>
+    <i class="bi bi-arrow-right"></i>
+  </a>
+</div>
+{% endif %}
+
+<!-- Primary KPI Statistics Cards Grid (Total, Critical, Investigating, Resolved) -->
+<div class="row g-3 mb-4">
+  <!-- Card 1: Total Incidents (Total Recorded test string preserved) -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="soc-card stat-card stat-card-total h-100">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-secondary small fw-semibold text-uppercase tracking-wider">Total Recorded</div>
+          <div class="stat-value my-2">{{ stats.total }}</div>
+          <div class="text-secondary small d-flex align-items-center gap-1">
+            <i class="bi bi-shield-check text-info"></i>
+            <span>Lifetime registry cases</span>
+          </div>
+        </div>
+        <div class="stat-icon text-info">
+          <i class="bi bi-shield-lock-fill"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: Critical Severity Incidents -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="soc-card stat-card stat-card-critical h-100">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-secondary small fw-semibold text-uppercase tracking-wider d-flex align-items-center gap-1">
+            <span>Critical Incidents</span>
+            {% if stats.critical > 0 %}<span class="pulse-indicator" style="width: 8px; height: 8px;"></span>{% endif %}
+          </div>
+          <div class="stat-value my-2 text-danger">{{ stats.critical }}</div>
+          <div class="text-secondary small d-flex align-items-center gap-1">
+            <i class="bi bi-exclamation-octagon text-danger"></i>
+            <span>Immediate triage priority</span>
+          </div>
+        </div>
+        <div class="stat-icon text-danger">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: Investigating Cases -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="soc-card stat-card stat-card-investigating h-100">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-secondary small fw-semibold text-uppercase tracking-wider">Investigating</div>
+          <div class="stat-value my-2 text-info">{{ stats.investigating }}</div>
+          <div class="text-secondary small d-flex align-items-center gap-1">
+            <i class="bi bi-search text-info"></i>
+            <span>Active tier-2 analyst triage</span>
+          </div>
+        </div>
+        <div class="stat-icon text-info">
+          <i class="bi bi-activity"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Resolved / Mitigated Cases -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="soc-card stat-card stat-card-resolved h-100">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-secondary small fw-semibold text-uppercase tracking-wider">Resolved / Mitigated</div>
+          <div class="stat-value my-2 text-success">{{ stats.resolved + stats.mitigated + stats.closed }}</div>
+          <div class="text-secondary small d-flex align-items-center gap-1">
+            <i class="bi bi-check2-circle text-success"></i>
+            <span>Remediated & confirmed</span>
+          </div>
+        </div>
+        <div class="stat-icon text-success">
+          <i class="bi bi-patch-check-fill"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Secondary Telemetry Micro-Pill Bar -->
+<div class="soc-card p-3 mb-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 font-mono small">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <span class="text-secondary text-uppercase fw-semibold" style="font-size: 0.72rem;">Case Breakdown:</span>
+      <span class="badge bg-dark border border-warning text-warning px-2 py-1">
+        Open: <strong>{{ stats.open }}</strong>
+      </span>
+      <span class="badge bg-dark border border-info text-info px-2 py-1">
+        Investigating: <strong>{{ stats.investigating }}</strong>
+      </span>
+      <span class="badge bg-dark border border-primary text-primary px-2 py-1">
+        Mitigated: <strong>{{ stats.mitigated }}</strong>
+      </span>
+      <span class="badge bg-dark border border-success text-success px-2 py-1">
+        Resolved: <strong>{{ stats.resolved }}</strong>
+      </span>
+      <span class="badge bg-dark border border-secondary text-secondary px-2 py-1">
+        Closed: <strong>{{ stats.closed }}</strong>
+      </span>
+    </div>
+    <div class="d-flex align-items-center gap-2 text-secondary" style="font-size: 0.75rem;">
+      <i class="bi bi-hdd-stack text-info"></i>
+      <span>Active Queue: <strong class="text-white">{{ stats.active_total }} cases</strong></span>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Section: Severity Distribution & Threat Categories -->
+<div class="row g-3 mb-4">
+  <!-- Chart 1: Severity Breakdown Doughnut -->
+  <div class="col-12 col-lg-5">
+    <div class="soc-card h-100">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-pie-chart-fill text-info"></i>
+          <span>Incidents by Severity</span>
+        </span>
+        <span class="badge bg-dark border border-secondary text-info font-mono" style="font-size: 0.68rem;">LIVE BREAKDOWN</span>
+      </div>
+      <div class="p-3" style="height: 290px; position: relative;">
+        <canvas id="severityChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 2: Threat Categories Horizontal Bar -->
+  <div class="col-12 col-lg-7">
+    <div class="soc-card h-100">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-bar-chart-fill text-info"></i>
+          <span>Threat Vectors & Incident Categories</span>
+        </span>
+        <span class="badge bg-dark border border-secondary text-secondary font-mono" style="font-size: 0.68rem;">DISTRIBUTION</span>
+      </div>
+      <div class="p-3" style="height: 290px; position: relative;">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart 3: 24-Hour Incident Activity -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="soc-card h-100">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-activity text-info"></i>
+          <span>24-Hour Incident Activity</span>
+        </span>
+        <span class="badge bg-dark border border-secondary text-info font-mono"
+              style="font-size: 0.68rem;">LAST 24 HOURS</span>
+      </div>
+      <div class="p-3" style="height: 290px; position: relative;">
+        <canvas id="activityChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Security Incidents & Activity Feed Section -->
+<div class="row g-3">
+  <!-- Left: Recently Reported Incidents Table -->
+  <div class="col-12 col-xl-8">
+    <div class="soc-card h-100">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-shield-shaded text-info"></i>
+          <span>Recently Reported Incidents</span>
+        </span>
+        <a href="{{ url_for('main.incidents_list') }}" class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem;">
+          View All Cases <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-soc align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Case Number</th>
+              <th>Incident Details & Target Asset</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Assigned Analyst</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inc in recent_incidents %}
+            <tr>
+              <!-- Case Number with Copy Button -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <a href="{{ url_for('main.incident_detail', incident_id=inc.id) }}" class="fw-bold font-mono text-decoration-none text-info">
+                    {{ inc.incident_number }}
+                  </a>
+                  <button type="button" class="btn btn-link p-0 text-secondary copy-tooltip" data-copy="{{ inc.incident_number }}" title="Copy Case ID">
+                    <i class="bi bi-clipboard" style="font-size: 0.75rem;"></i>
+                  </button>
+                </div>
+              </td>
+
+              <!-- Title & Affected System -->
+              <td>
+                <div class="fw-semibold text-white text-truncate" style="max-width: 260px;">{{ inc.title }}</div>
+                <div class="text-secondary small font-mono d-flex align-items-center gap-1">
+                  <i class="bi bi-hdd-network text-info"></i>
+                  <span>{{ inc.affected_system }}</span>
+                </div>
+              </td>
+
+              <!-- Severity Badge -->
+              <td>
+                <span class="badge badge-{{ inc.severity|lower }} px-2 py-1">
+                  {{ inc.severity }}
+                </span>
+              </td>
+
+              <!-- Status Badge -->
+              <td>
+                <span class="badge badge-{{ inc.status|lower }} px-2 py-1">
+                  {{ inc.status }}
+                </span>
+              </td>
+
+              <!-- Assigned Analyst -->
+              <td>
+                <div class="small text-light d-flex align-items-center gap-1">
+                  <i class="bi bi-person-circle text-secondary"></i>
+                  <span class="{% if inc.assigned_to == 'Unassigned' %}text-warning{% endif %}">{{ inc.assigned_to }}</span>
+                </div>
+              </td>
+
+              <!-- Quick Investigate Action -->
+              <td class="text-end">
+                <a href="{{ url_for('main.incident_detail', incident_id=inc.id) }}" class="btn btn-sm btn-outline-info py-1 px-2 d-inline-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                  <span>Investigate</span>
+                  <i class="bi bi-chevron-right"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center py-5 text-secondary">
+                <i class="bi bi-shield-slash fs-2 d-block mb-2 text-muted"></i>
+                <div class="fw-bold text-white mb-1">No Incidents Reported</div>
+                <p class="small mb-3">The security registry is currently clear. Click below to populate realistic simulation cases.</p>
+                <form action="{{ url_for('main.demo_seed') }}" method="POST" class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-warning">
+                    <i class="bi bi-database-fill-gear me-1"></i>Load Demo Incidents
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Activity Feed & Audit Trail -->
+  <div class="col-12 col-xl-4">
+    <div class="soc-card h-100">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history text-info"></i>
+          <span>Recent Activity History</span>
+        </span>
+        <span class="badge bg-secondary-subtle text-secondary font-mono" style="font-size: 0.65rem;">AUDIT LOG</span>
+      </div>
+      <div class="p-3" style="max-height: 440px; overflow-y: auto;">
+        {% if recent_audits %}
+        <div class="timeline">
+          {% for audit in recent_audits %}
+          <div class="timeline-item">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-semibold text-info small d-flex align-items-center gap-1">
+                {% if 'Created' in audit.action %}
+                  <i class="bi bi-plus-circle text-success"></i>
+                {% elif 'Status' in audit.action %}
+                  <i class="bi bi-arrow-repeat text-warning"></i>
+                {% elif 'Note' in audit.action %}
+                  <i class="bi bi-chat-left-text text-info"></i>
+                {% elif 'Reassign' in audit.action or 'Assign' in audit.action %}
+                  <i class="bi bi-person-check text-primary"></i>
+                {% else %}
+                  <i class="bi bi-activity text-secondary"></i>
+                {% endif %}
+                <span>{{ audit.action }}</span>
+              </span>
+              <span class="text-secondary font-mono" style="font-size: 0.7rem;">
+                {{ audit.timestamp.strftime('%H:%M:%S') }}
+              </span>
+            </div>
+            <p class="text-light small mb-1" style="font-size: 0.8rem; line-height: 1.4;">{{ audit.details }}</p>
+            <div class="text-secondary font-mono" style="font-size: 0.72rem; display: flex; align-items: center; justify-content: space-between;">
+              <span><i class="bi bi-person me-1"></i>{{ audit.performed_by }}</span>
+              <a href="{{ url_for('main.incident_detail', incident_id=audit.incident_id) }}" class="text-info text-decoration-none hover-info">
+                Case #{{ audit.incident_id }}
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-secondary small">
+          <i class="bi bi-journal-x fs-2 d-block mb-2 text-muted"></i>
+          No audit logs recorded yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

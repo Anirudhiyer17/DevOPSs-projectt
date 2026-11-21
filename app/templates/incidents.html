@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Incident Registry | SOC Operations Console{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h2 class="fw-bold mb-0 text-white tracking-tight">Incident Management Registry</h2>
+      <span class="badge bg-dark border border-secondary text-info font-mono px-2 py-1" style="font-size: 0.65rem;">
+        {{ total_found }} CASES REGISTERED
+      </span>
+    </div>
+    <p class="text-secondary mb-0 small">Comprehensive security incident registry with multi-vector search, asset classification, and response tracking.</p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('main.export_csv') }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+      <i class="bi bi-download"></i>
+      <span>Export CSV</span>
+    </a>
+    <a href="{{ url_for('main.incident_create') }}" class="btn btn-sm btn-cyan d-flex align-items-center gap-1 shadow">
+      <i class="bi bi-plus-circle-fill"></i>
+      <span>Report New Incident</span>
+    </a>
+  </div>
+</div>
+
+<!-- Quick Filter Chips Bar -->
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="text-secondary small fw-semibold me-1"><i class="bi bi-funnel me-1"></i>Quick Triage:</span>
+  <a href="{{ url_for('main.incidents_list') }}" class="filter-chip {% if not selected_severity and not selected_status and not selected_category %}active{% endif %}">
+    <span>All Cases</span>
+    <span class="badge bg-dark text-secondary ms-1">{{ total_found if not selected_severity and not selected_status else '' }}</span>
+  </a>
+  <a href="{{ url_for('main.incidents_list', severity='Critical') }}" class="filter-chip {% if selected_severity == 'Critical' %}active{% endif %}">
+    <span class="pulse-indicator" style="width: 7px; height: 7px;"></span>
+    <span>Critical</span>
+  </a>
+  <a href="{{ url_for('main.incidents_list', status='Open') }}" class="filter-chip {% if selected_status == 'Open' %}active{% endif %}">
+    <i class="bi bi-exclamation-diamond text-warning"></i>
+    <span>Open Queue</span>
+  </a>
+  <a href="{{ url_for('main.incidents_list', status='Investigating') }}" class="filter-chip {% if selected_status == 'Investigating' %}active{% endif %}">
+    <i class="bi bi-search text-info"></i>
+    <span>Active Investigation</span>
+  </a>
+  <a href="{{ url_for('main.incidents_list', status='Resolved') }}" class="filter-chip {% if selected_status == 'Resolved' %}active{% endif %}">
+    <i class="bi bi-check-circle text-success"></i>
+    <span>Resolved</span>
+  </a>
+</div>
+
+<!-- Search & Multi-Parameter Filter Console -->
+<div class="soc-card p-3 p-md-4 mb-4">
+  <form method="GET" action="{{ url_for('main.incidents_list') }}" class="row g-3 align-items-end">
+    <!-- Keyword Search -->
+    <div class="col-12 col-md-4 col-xl-3">
+      <label class="form-label small mb-1 fw-semibold">
+        <i class="bi bi-search me-1 text-info"></i>Search Keywords
+      </label>
+      <div class="input-group input-group-sm">
+        <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="ID, Title, Asset, Assignee...">
+      </div>
+    </div>
+
+    <!-- Severity Filter -->
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1 fw-semibold">Severity</label>
+      <select name="severity" class="form-select form-select-sm">
+        <option value="">All Severities</option>
+        {% for sev in severity_levels %}
+          <option value="{{ sev }}" {% if selected_severity == sev %}selected{% endif %}>{{ sev }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Status Filter -->
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1 fw-semibold">Workflow Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All Statuses</option>
+        {% for st in status_choices %}
+          <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1 fw-semibold">Threat Category</label>
+      <select name="category" class="form-select form-select-sm">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Sort Selector -->
+    <div class="col-6 col-md-2">
+      <label class="form-label small mb-1 fw-semibold">Sort Order</label>
+      <select name="sort" class="form-select form-select-sm">
+        <option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Newest First</option>
+        <option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+        <option value="severity" {% if selected_sort == 'severity' %}selected{% endif %}>Severity (High to Low)</option>
+      </select>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="col-12 col-md-2 col-xl-1 d-flex gap-2">
+      <button type="submit" class="btn btn-sm btn-cyan w-100 fw-semibold" title="Execute Query">
+        <i class="bi bi-funnel-fill"></i>
+      </button>
+      {% if search_query or selected_severity or selected_status or selected_category or selected_sort != 'newest' %}
+      <a href="{{ url_for('main.incidents_list') }}" class="btn btn-sm btn-outline-secondary" title="Reset Query">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Active Filter Badges -->
+  {% if search_query or selected_severity or selected_status or selected_category %}
+  <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top border-soc-border">
+    <span class="small text-secondary fw-semibold">Active Criteria:</span>
+    {% if search_query %}
+      <span class="badge bg-dark border border-secondary text-white font-mono">
+        Keyword: "{{ search_query }}"
+      </span>
+    {% endif %}
+    {% if selected_severity %}
+      <span class="badge badge-{{ selected_severity|lower }}">
+        Severity: {{ selected_severity }}
+      </span>
+    {% endif %}
+    {% if selected_status %}
+      <span class="badge badge-{{ selected_status|lower }}">
+        Status: {{ selected_status }}
+      </span>
+    {% endif %}
+    {% if selected_category %}
+      <span class="badge bg-dark border border-info text-info font-mono">
+        Category: {{ selected_category }}
+      </span>
+    {% endif %}
+    <a href="{{ url_for('main.incidents_list') }}" class="small text-danger text-decoration-none ms-2 d-inline-flex align-items-center gap-1">
+      <i class="bi bi-trash3"></i>
+      <span>Clear all filters</span>
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modern Enterprise Incident Data Table -->
+<div class="soc-card">
+  <div class="table-responsive">
+    <table class="table table-soc align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Case Number</th>
+          <th>Incident Title & Scope</th>
+          <th>Category</th>
+          <th>Severity</th>
+          <th>Status</th>
+          <th>Affected Asset</th>
+          <th>Assigned Analyst</th>
+          <th>Reported</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inc in incidents %}
+        <tr>
+          <!-- Case Number with Copy Button -->
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <a href="{{ url_for('main.incident_detail', incident_id=inc.id) }}" class="fw-bold font-mono text-decoration-none text-info">
+                {{ inc.incident_number }}
+              </a>
+              <button type="button" class="btn btn-link p-0 text-secondary copy-tooltip" data-copy="{{ inc.incident_number }}" title="Copy Case ID">
+                <i class="bi bi-clipboard" style="font-size: 0.75rem;"></i>
+              </button>
+            </div>
+          </td>
+
+          <!-- Title & Description Snippet -->
+          <td>
+            <div class="fw-semibold text-white">{{ inc.title }}</div>
+            <div class="text-secondary small text-truncate" style="max-width: 260px;">
+              {{ inc.description }}
+            </div>
+          </td>
+
+          <!-- Category -->
+          <td>
+            <span class="badge bg-dark border border-secondary text-secondary font-mono" style="font-size: 0.72rem;">
+              {{ inc.category }}
+            </span>
+          </td>
+
+          <!-- Severity Badge -->
+          <td>
+            <span class="badge badge-{{ inc.severity|lower }} px-2 py-1">
+              {{ inc.severity }}
+            </span>
+          </td>
+
+          <!-- Status Badge -->
+          <td>
+            <span class="badge badge-{{ inc.status|lower }} px-2 py-1">
+              {{ inc.status }}
+            </span>
+          </td>
+
+          <!-- Affected System -->
+          <td>
+            <span class="font-mono small text-info d-flex align-items-center gap-1">
+              <i class="bi bi-hdd-network"></i>
+              <span>{{ inc.affected_system }}</span>
+            </span>
+          </td>
+
+          <!-- Assigned Specialist -->
+          <td>
+            <span class="small d-flex align-items-center gap-1 {% if inc.assigned_to == 'Unassigned' %}text-warning{% else %}text-light{% endif %}">
+              <i class="bi bi-person-badge text-secondary"></i>
+              <span>{{ inc.assigned_to }}</span>
+            </span>
+          </td>
+
+          <!-- Created Date -->
+          <td>
+            <span class="text-secondary small font-mono">
+              {{ inc.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </span>
+          </td>
+
+          <!-- Actions -->
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('main.incident_detail', incident_id=inc.id) }}" class="btn btn-outline-info" title="Open Case Dossier">
+                <i class="bi bi-folder2-open"></i>
+              </a>
+              <a href="{{ url_for('main.incident_edit', incident_id=inc.id) }}" class="btn btn-outline-secondary" title="Edit Metadata">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <!-- No Incidents Found State (test-asserted string preserved) -->
+        <tr>
+          <td colspan="9" class="text-center py-5 text-secondary">
+            <i class="bi bi-shield-slash fs-1 d-block mb-2 text-muted"></i>
+            <h5 class="fw-bold text-white mb-1">No Incidents Found</h5>
+            <p class="small text-secondary mb-3">No incident cases match the selected search criteria or filter combinations.</p>
+            <a href="{{ url_for('main.incidents_list') }}" class="btn btn-sm btn-outline-info">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Query Filters
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

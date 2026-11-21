@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block title %}Case {{ incident.incident_number }} | SOC Incident Dossier{% endblock %}
+
+{% block content %}
+<!-- Back link & Case Header Bar -->
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2 font-mono small">
+    <a href="{{ url_for('main.incidents_list') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Back to Registry
+    </a>
+    <span class="text-secondary">/</span>
+    <span class="text-info fw-bold">{{ incident.incident_number }}</span>
+  </div>
+
+  <!-- Primary Case Command Card -->
+  <div class="soc-card p-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <h3 class="fw-bold mb-0 text-white">{{ incident.title }}</h3>
+          <span class="badge badge-{{ incident.severity|lower }} px-2 py-1 font-mono">
+            {{ incident.severity }}
+          </span>
+          <span class="badge badge-{{ incident.status|lower }} px-2 py-1 font-mono">
+            {{ incident.status }}
+          </span>
+        </div>
+        <div class="text-secondary small font-mono d-flex flex-wrap align-items-center gap-3">
+          <span><i class="bi bi-tag-fill me-1 text-info"></i>{{ incident.category }}</span>
+          <span><i class="bi bi-hdd-network-fill me-1 text-info"></i>{{ incident.affected_system }}</span>
+          <span><i class="bi bi-clock-history me-1 text-info"></i>Created: {{ incident.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+        </div>
+      </div>
+
+      <!-- Quick Workflow Transition & Case Actions -->
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <form action="{{ url_for('main.incident_update_status', incident_id=incident.id) }}" method="POST" class="d-flex align-items-center gap-2">
+          <input type="hidden" name="analyst_name" value="SOC Lead">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-dark border-secondary text-secondary">
+              <i class="bi bi-arrow-repeat"></i>
+            </span>
+            <select name="status" class="form-select form-select-sm" style="min-width: 160px;" onchange="this.form.submit()" title="Change Incident Status">
+              <option value="" disabled>Transition Status...</option>
+              {% for st in status_choices %}
+                <option value="{{ st }}" {% if incident.status == st %}selected{% endif %}>
+                  {{ st }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </form>
+
+        <a href="{{ url_for('main.incident_edit', incident_id=incident.id) }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Edit Incident Metadata">
+          <i class="bi bi-pencil"></i>
+          <span>Edit Case</span>
+        </a>
+
+        <button type="button" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#deleteIncidentModal" title="Delete Case">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- SOC Incident Lifecycle Stepper -->
+    {% set stages = ['Open', 'Investigating', 'Mitigated', 'Resolved', 'Closed'] %}
+    {% set current_idx = 0 %}
+    {% if incident.status == 'Open' %}{% set current_idx = 0 %}
+    {% elif incident.status == 'Investigating' %}{% set current_idx = 1 %}
+    {% elif incident.status == 'Mitigated' %}{% set current_idx = 2 %}
+    {% elif incident.status == 'Resolved' %}{% set current_idx = 3 %}
+    {% elif incident.status == 'Closed' %}{% set current_idx = 4 %}{% endif %}
+
+    <div class="soc-stepper mt-3 pt-3 border-top border-soc-border">
+      {% for st in stages %}
+        {% set step_idx = loop.index0 %}
+        <div class="stepper-step {% if step_idx < current_idx %}completed{% elif step_idx == current_idx %}current{% endif %}">
+          <div class="stepper-circle">
+            {% if step_idx < current_idx %}
+              <i class="bi bi-check-lg"></i>
+            {% elif step_idx == current_idx %}
+              <i class="bi bi-record-circle-fill"></i>
+            {% else %}
+              <span>{{ loop.index }}</span>
+            {% endif %}
+          </div>
+          <div class="stepper-label">{{ st }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Case Information & Specialist Assignment -->
+  <div class="col-12 col-lg-5">
+    <!-- Incident Details Card (Case Dossier Overview test string preserved) -->
+    <div class="soc-card mb-4">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-shield-shaded text-info"></i>
+          <span>Case Dossier Overview</span>
+        </span>
+        <span class="badge bg-dark border border-secondary text-info font-mono" style="font-size: 0.7rem;">ID #{{ incident.id }}</span>
+      </div>
+      <div class="p-3 p-md-4">
+        <!-- Threat Scope / IoC -->
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <label class="form-label text-secondary small fw-bold text-uppercase font-mono mb-0">
+              <i class="bi bi-terminal me-1 text-info"></i>Description & Threat Telemetry
+            </label>
+            <button type="button" class="btn btn-link p-0 text-secondary copy-tooltip" data-copy="{{ incident.description }}" title="Copy Description & IoCs">
+              <i class="bi bi-clipboard" style="font-size: 0.75rem;"></i>
+            </button>
+          </div>
+          <div class="p-3 rounded-3 bg-dark border border-soc-border text-light font-mono" style="font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; max-height: 250px; overflow-y: auto;">
+{{ incident.description }}
+          </div>
+        </div>
+
+        <!-- System & Threat Category Grid -->
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Affected Asset</small>
+            <span class="font-mono text-info small fw-bold d-flex align-items-center gap-1 mt-1">
+              <i class="bi bi-hdd-network"></i>
+              <span>{{ incident.affected_system }}</span>
+            </span>
+          </div>
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Threat Category</small>
+            <span class="badge bg-dark border border-secondary text-white font-mono mt-1">
+              {{ incident.category }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Reporter & Assigned Specialist -->
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Reported By</small>
+            <span class="text-light small d-flex align-items-center gap-1 mt-1">
+              <i class="bi bi-person-circle text-secondary"></i>
+              <span>{{ incident.reporter }}</span>
+            </span>
+          </div>
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Assigned Specialist</small>
+            <span class="text-light small fw-semibold d-flex align-items-center gap-1 mt-1">
+              <i class="bi bi-person-badge text-info"></i>
+              <span>{{ incident.assigned_to }}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Timestamps -->
+        <div class="row g-3 pt-3 border-top border-soc-border">
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Last Telemetry Update</small>
+            <span class="text-secondary small font-mono">
+              {{ incident.updated_at.strftime('%Y-%m-%d %H:%M') }}
+            </span>
+          </div>
+          <div class="col-6">
+            <small class="text-secondary d-block fw-semibold text-uppercase font-mono" style="font-size: 0.7rem;">Resolution Timestamp</small>
+            <span class="text-secondary small font-mono">
+              {% if incident.resolved_at %}
+                <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ incident.resolved_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% else %}
+                <span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reassignment Card -->
+    <div class="soc-card mb-4">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-person-lines-fill text-info"></i>
+          <span>Assign / Reassign Specialist</span>
+        </span>
+      </div>
+      <div class="p-3 p-md-4">
+        <form action="{{ url_for('main.incident_assign', incident_id=incident.id) }}" method="POST">
+          <div class="mb-3">
+            <label class="form-label small">Security Specialist Name / Role</label>
+            <input type="text" name="assigned_to" class="form-control form-control-sm" value="{{ incident.assigned_to }}" placeholder="e.g. Alex Chen (SOC Tier 2)" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Authorizing Operator</label>
+            <input type="text" name="assigned_by" class="form-control form-control-sm" value="SOC Lead">
+          </div>
+          <button type="submit" class="btn btn-sm btn-outline-info w-100 fw-semibold">
+            <i class="bi bi-check2 me-1"></i> Update Case Assignment
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Investigation Notes & Audit Trail -->
+  <div class="col-12 col-lg-7">
+    <!-- Investigation Notes Section -->
+    <div class="soc-card mb-4">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-chat-left-text text-info"></i>
+          <span>Analyst Investigation Notes</span>
+        </span>
+        <span class="badge bg-secondary font-mono" style="font-size: 0.7rem;">{{ incident.notes|length }} FINDINGS</span>
+      </div>
+      <div class="p-3 p-md-4">
+        <!-- Add Note Form -->
+        <form action="{{ url_for('main.incident_add_note', incident_id=incident.id) }}" method="POST" class="mb-4 p-3 rounded-3 bg-dark border border-soc-border">
+          <h6 class="fw-bold text-info mb-2 small text-uppercase font-mono">
+            <i class="bi bi-plus-circle me-1"></i>Record Investigation Finding
+          </h6>
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-md-6">
+              <input type="text" name="author" class="form-control form-control-sm" placeholder="Analyst Name / Callout" value="SOC Analyst" required>
+            </div>
+          </div>
+          <div class="mb-2">
+            <textarea name="content" rows="3" class="form-control form-control-sm font-mono" placeholder="Document triage findings, evidence hashes, containment steps taken, firewall rules deployed..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-sm btn-cyan fw-bold">
+            <i class="bi bi-send-fill me-1"></i> Append Investigation Note
+          </button>
+        </form>
+
+        <!-- Notes Feed -->
+        <div class="notes-feed">
+          {% for note in incident.notes %}
+          <div class="p-3 mb-3 rounded-3 bg-dark border border-soc-border">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-soc-border">
+              <span class="fw-bold text-info small d-flex align-items-center gap-1 font-mono">
+                <i class="bi bi-person-badge-fill"></i>
+                <span>{{ note.author }}</span>
+              </span>
+              <span class="text-secondary font-mono" style="font-size: 0.72rem;">
+                {{ note.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+              </span>
+            </div>
+            <p class="text-light mb-0 small font-mono" style="white-space: pre-wrap; line-height: 1.5;">{{ note.content }}</p>
+          </div>
+          {% else %}
+          <div class="text-center py-4 text-secondary small">
+            <i class="bi bi-journal-x fs-2 d-block mb-1 text-muted"></i>
+            No investigation notes added yet. Use the form above to document incident response actions.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit History & Case Activity Log -->
+    <div class="soc-card">
+      <div class="soc-card-header">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history text-info"></i>
+          <span>Audit Trail & Case Activity Log</span>
+        </span>
+        <span class="badge bg-secondary font-mono" style="font-size: 0.7rem;">{{ incident.audit_logs|length }} ENTRIES</span>
+      </div>
+      <div class="p-3 p-md-4" style="max-height: 420px; overflow-y: auto;">
+        <div class="timeline">
+          {% for log in incident.audit_logs %}
+          <div class="timeline-item">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-semibold text-info small font-mono">{{ log.action }}</span>
+              <span class="text-secondary font-mono" style="font-size: 0.72rem;">
+                {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+              </span>
+            </div>
+            <p class="text-light small mb-1" style="font-size: 0.82rem; line-height: 1.4;">{{ log.details }}</p>
+            <div class="text-secondary font-mono" style="font-size: 0.72rem;">
+              <i class="bi bi-person me-1"></i>Operator: {{ log.performed_by }}
+            </div>
+          </div>
+          {% else %}
+          <div class="text-center py-3 text-secondary small">
+            No audit log entries recorded.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Incident Modal -->
+<div class="modal fade" id="deleteIncidentModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content soc-card border-danger">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger d-flex align-items-center gap-2" id="deleteModalLabel">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>Confirm Incident Deletion</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('main.incident_delete', incident_id=incident.id) }}" method="POST">
+        <div class="modal-body text-light">
+          <p>Are you sure you want to permanently purge case <strong class="text-info font-mono">{{ incident.incident_number }}</strong>: <em>"{{ incident.title }}"</em>?</p>
+          <div class="alert alert-danger bg-danger-subtle border border-danger-subtle text-danger small mb-3">
+            <i class="bi bi-shield-x me-1"></i> This action permanently deletes all associated investigation findings, evidence records, and audit log entries.
+          </div>
+          <div class="mb-2">
+            <label class="form-label small text-secondary">Authorizing Operator</label>
+            <input type="text" name="deleted_by" class="form-control form-control-sm" value="SOC Lead" required>
+          </div>
+        </div>
+        <div class="modal-footer border-soc-border">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-danger fw-semibold">Permanently Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
